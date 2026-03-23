@@ -65,8 +65,8 @@ class Inference(nn.Module):
         raise NotImplementedError
 
     def mean_dist(self, dist_list):
+        n_sampling = len(dist_list)
         if self.continuous_state: 
-            n_sampling = len(dist_list)
             mu = torch.stack([dist.mean for dist in dist_list], dim=-2)
             mean_mu = mu.mean(dim=1)
             if self.learn_std:
@@ -79,12 +79,17 @@ class Inference(nn.Module):
             mean_dist = []
             for i, dist_i in enumerate(dist_list[0]):
                 if isinstance(dist_i, Normal): 
-                    mu = torch.stack([dist[i].mean for dist in dist_list], dim=-2)
-                    std = torch.stack([dist[i].stddev for dist in dist_list], dim=-2)
-                    mean_dist_i = Normal(mu, std)
+                    mu = torch.stack([dist[i].mean for dist in dist_list], dim=0)
+                    mean_mu = mu.mean(dim=0)
+                    if self.learn_std:
+                        std = torch.stack([dist[i].stddev for dist in dist_list], dim=0)
+                        mean_std = torch.norm(std, 2, dim=0) / n_sampling
+                    else:
+                        mean_std = torch.ones_like(mean_mu)
+                    mean_dist_i = Normal(mean_mu, mean_std)
                 elif isinstance(dist_i, OneHotCategorical):
-                    probs = torch.stack([dist[i].probs for dist in dist_list], dim=-2)
-                    probs = probs.mean(dim=1)
+                    probs = torch.stack([dist[i].probs for dist in dist_list], dim=0)
+                    probs = probs.mean(dim=0)
                     mean_dist_i = OneHotCategorical(probs=probs)
                 else:
                     raise NotImplementedError
@@ -264,7 +269,8 @@ class Inference(nn.Module):
         assert not self.training
         self.eval()
         obs, actions, next_obses, _ = self.preprocess(obs, actions, next_obses)
-        if len(actions.shape) == 2: actions = actions.unsqueeze(-1)
+        if len(actions.shape) == 2:
+            actions = actions[:, None] if self.continuous_action else actions.unsqueeze(-1)
         with torch.no_grad():
             feature = self.encoder(obs)
             next_feature = self.encoder.get_clean_obs(next_obses)
@@ -290,6 +296,15 @@ class Inference(nn.Module):
                 accuracy = torch.stack(accuracy, dim=-1)
                 accuracy = to_numpy(accuracy)
                 loss_detail["accuracy"] = accuracy.mean()
+            elif self.params.env_params.env_name == "Magnetic":
+                if not hasattr(self, "infer_local_mask"):
+                    raise NotImplementedError
+                gt_lcms = info_batch["lcms"]
+                if not isinstance(gt_lcms, torch.Tensor):
+                    gt_lcms = torch.tensor(gt_lcms, dtype=torch.float32, device=self.device)
+                pred_lcms = self.infer_local_mask(feature, actions[:, 0], current_pred_step=0)
+                shd = torch.abs(pred_lcms - gt_lcms).sum(dim=(1, 2))
+                loss_detail["shd"] = shd.mean().item()
             else:
                 raise NotImplementedError
         return loss_detail
@@ -299,7 +314,8 @@ class Inference(nn.Module):
         assert not self.training == self.is_eval
         self.eval()
         obs, actions, next_obses, _ = self.preprocess(obs, actions, next_obses)
-        if len(actions.shape) == 2: actions = actions.unsqueeze(-1)
+        if len(actions.shape) == 2:
+            actions = actions[:, None] if self.continuous_action else actions.unsqueeze(-1)
 
         with torch.no_grad():
             feature = self.encoder(obs)

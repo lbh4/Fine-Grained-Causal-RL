@@ -12,6 +12,7 @@ import numpy as np
 import torch
 
 from ..env.chemical_env import Chemical
+from ..env.magnetic_env import Magnetic
 from .multiprocessing_env import SubprocVecEnv
 
 
@@ -50,7 +51,8 @@ class TrainingParams(AttrDict):
         training_params = self.training_params
 
         if train:
-            if training_params_fname == "policy_params.json":
+            config_name = os.path.basename(training_params_fname)
+            if config_name.startswith("policy_params"):
                 sub_dirname = "task" if training_params.rl_algo == "model_based" else "dynamics"
             else:
                 raise NotImplementedError
@@ -59,7 +61,7 @@ class TrainingParams(AttrDict):
             experiment_dirname = info + "_" + time.strftime("%Y_%m_%d_%H_%M_%S")
 
             self.replay_buffer_dir = None
-            if training_params_fname == "policy_params.json" and training_params.replay_buffer_params.saving_freq:
+            if config_name.startswith("policy_params") and training_params.replay_buffer_params.saving_freq:
                 self.replay_buffer_dir = os.path.join(repo_path, "replay_buffer", experiment_dirname)
                 os.makedirs(self.replay_buffer_dir)
 
@@ -81,6 +83,8 @@ def override_params_from_cli_args(params):
 
     if len(args) > 1:
         for arg in args[1:]:
+            if arg.startswith("--config="):
+                continue
             keys, v = arg.split("=")
             keys = keys.split("--")[1].split(".")
             param = params
@@ -179,7 +183,10 @@ def update_obs_act_spec(env, params):
     """
     get act_dim and obs_spec from env and add to params
     """
-    params.continuous_state = params.continuous_action = params.continuous_factor = not params.env_params.env_name in ["Physical", "Chemical"]
+    default_continuous = not params.env_params.env_name in ["Physical", "Chemical", "Magnetic"]
+    params.continuous_state = getattr(env, "continuous_state", default_continuous)
+    params.continuous_action = getattr(env, "continuous_action", params.continuous_state)
+    params.continuous_factor = getattr(env, "continuous_factor", params.continuous_state and params.continuous_action)
     if params.encoder_params.encoder_type == "conv":
         params.continuous_state = True
     
@@ -188,13 +195,9 @@ def update_obs_act_spec(env, params):
     params.feature_inner_dim = env.feature_inner_dim
     params.obs_spec = obs_spec = preprocess_obs(env.observation_spec(), params)
     params.num_action_variable = env.num_action_variable
-        
-    if params.continuous_factor:
-        params.obs_dims = None
-        params.action_spec = env.action_spec
-    else:
-        params.obs_dims = obs_dims = env.observation_dims()
-        params.action_spec = None
+
+    params.obs_dims = None if params.continuous_state else env.observation_dims()
+    params.action_spec = env.action_spec if params.continuous_action else None
 
 
 def get_single_env(params, load_dir=None, test_idx=None, env_idx=None):
@@ -216,6 +219,14 @@ def get_single_env(params, load_dir=None, test_idx=None, env_idx=None):
         if env_idx is not None:
             copied_env_params.name += f"_{str(env_idx)}"
         env = Chemical(copied_params, load_dir)
+    elif env_name == "Magnetic":
+        copied_params = deepcopy(params)
+        copied_env_params = copied_params.env_params.magnetic_env_params
+        if test_idx is not None:
+            test_params = copied_env_params.test_params[test_idx]
+            for k, v in test_params.items():
+                setattr(copied_env_params, k, v)
+        env = Magnetic(copied_params)
     else:
         raise ValueError("Unknown env_name: {}".format(env_name))
 
@@ -233,9 +244,12 @@ def get_env(params, load_dir=None, test_idx=None):
     env_name = params.env_params.env_name
     if num_env == 1:
         return get_single_env(params, load_dir, test_idx)
-    else:
-        assert "Chemical" == env_name
+    elif env_name == "Chemical":
         return SubprocVecEnv([get_subproc_env(params, load_dir, test_idx, env_idx) for env_idx in range(num_env)])
+    elif env_name == "Magnetic":
+        raise ValueError("Magnetic currently supports only num_env == 1 to match the paper setup.")
+    else:
+        raise ValueError("Unknown env_name: {}".format(env_name))
 
 
 def get_start_step_from_model_loading(params):

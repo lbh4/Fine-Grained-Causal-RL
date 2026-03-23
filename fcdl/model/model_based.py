@@ -14,7 +14,7 @@ from ..utils.utils import to_numpy, preprocess_obs, postprocess_obs
 class ActionDistribution:
     def __init__(self, params):
         self.action_dim = action_dim = params.action_dim
-        self.continuous_action = params.continuous_state
+        self.continuous_action = params.continuous_action
         self.env_name = params.env_params.env_name
 
         model_based_params = params.policy_params.model_based_params
@@ -92,6 +92,7 @@ class ActionDistribution:
     def get_action(self):
         if self.continuous_action:
             action = self.dist.mean[0]
+            action = action.reshape(-1)[-self.action_dim:]
             action = self.postprocess_action(action)
         else:
             action = self.dist.probs[0].argmax()
@@ -126,7 +127,7 @@ class ModelBased(nn.Module):
         else:
             raise ValueError("num_env must be >= 1")
 
-        if self.continuous_state:
+        if self.continuous_action:
             self.action_low, self.action_high = params.action_spec
             self.action_mean = (self.action_low + self.action_high) / 2
             self.action_scale = (self.action_high - self.action_low) / 2
@@ -146,6 +147,7 @@ class ModelBased(nn.Module):
         model_based_params = self.model_based_params
 
         self.continuous_state = continuous_state = params.continuous_state
+        self.continuous_action = params.continuous_action
 
         feature_dim = self.encoder.feature_dim
         self.feature_inner_dim = feature_inner_dim = self.params.feature_inner_dim
@@ -191,7 +193,7 @@ class ModelBased(nn.Module):
         pass
 
     def act_randomly(self):
-        if self.continuous_state:
+        if self.continuous_action:
             return self.action_mean + self.action_scale * (np.random.uniform(-1, 1, self.action_scale.shape) if self.num_env == 1 else np.random.uniform(-1, 1, (self.num_env, *self.action_scale.shape)))
         else:
             return np.random.randint(self.action_dim) if self.num_env == 1 else np.random.randint(self.action_dim, size=self.num_env)
@@ -210,6 +212,19 @@ class ModelBased(nn.Module):
             return torch.cat(goal, dim=-1)
 
     def ground_truth_reward(self, feature, action, goal_feature):
+        if self.params.env_params.env_name == "Magnetic":
+            magnetic_env_params = self.params.env_params.magnetic_env_params
+            ball_x, ball_y = feature[1], feature[2]
+            eef_x, eef_y, eef_z = feature[6], feature[7], feature[8]
+            distance = (
+                torch.abs(eef_x - ball_x)
+                + torch.abs(eef_y - ball_y)
+                + torch.abs(eef_z - magnetic_env_params.goal_height)
+            )
+            pred_reward = 1.0 - torch.tanh(magnetic_env_params.reward_scale * distance)
+            pred_reward = pred_reward.reshape(pred_reward.shape[0], -1, 1)
+            return pred_reward
+
         if not self.continuous_state:
             feature = torch.cat(feature, dim=-1)
 
@@ -254,7 +269,7 @@ class ModelBased(nn.Module):
         """
         :param obs: (obs_spec)
         """
-        if not deterministic and not self.continuous_state:
+        if not deterministic and not self.continuous_action:
             if np.random.rand() < self.model_based_params.action_noise_eps:
                 action = self.act_randomly()
                 return action
@@ -272,12 +287,12 @@ class ModelBased(nn.Module):
         else:
             raise ValueError("Unknown planner type: {}".format(planner_type))
 
-        if not deterministic and self.continuous_state:
+        if not deterministic and self.continuous_action:
             action_noise = self.model_based_params.action_noise
             action_noise = np.random.normal(scale=action_noise, size=self.action_dim)
             action = np.clip(action + action_noise, self.action_low, self.action_high)
 
-        if self.continuous_state:
+        if self.continuous_action:
             action = np.clip(action, self.action_low, self.action_high)
         # if stage == 'test' and self.params.env_params.env_name == 'Chemical':
         #     assert (action > 4).all()
@@ -353,7 +368,7 @@ class ModelBased(nn.Module):
                     self.action_dist.update(actions, pred_rewards)
                 else:
                     pred_rewards = pred_rewards.reshape(self.num_env, n_candidate, self.n_horizon_step, 1)
-                    if self.continuous_state:
+                    if self.continuous_action:
                         actions = actions.reshape(self.num_env, n_candidate, self.n_horizon_step, self.action_dim)
                     else:
                         actions = actions.reshape(self.num_env, n_candidate, self.n_horizon_step, 1)

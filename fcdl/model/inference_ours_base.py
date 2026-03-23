@@ -126,8 +126,10 @@ class InferenceOursBase(Inference, metaclass=ABCMeta):
 
     def extract_action_feature(self, action):
         if self.num_action_variable == 1:
+            action = action.reshape(-1, self.action_dim)
             action = action.unsqueeze(dim=0)
         else:
+            action = action.reshape(-1, self.num_action_variable)
             action = action.permute(1, 0)
             action = action.unsqueeze(dim=-1)
         action_feature = forward_network(action, self.action_feature_weights, self.action_feature_biases)
@@ -228,6 +230,19 @@ class InferenceOursBase(Inference, metaclass=ABCMeta):
         assert sampling_num == local_mask.size(0)
 
         return self.forward_with_local_mask(state_feature, action_feature, feature, local_mask, prob, current_pred_step)
+
+    def infer_local_mask(self, feature, action, current_pred_step=0):
+        action_feature = self.extract_action_feature(action)
+        state_feature = self.extract_state_feature(feature)
+
+        bs = state_feature.size(1)
+        if self.use_gt_global_mask:
+            prob = self.gt_global_mask.clone().repeat(bs, 1, 1)
+        else:
+            _, prob = self.local_causal_model(state_feature, action_feature, current_pred_step, training=False)
+            prob = (prob > 0.5).float()
+
+        return prob
 
     @abstractmethod
     def forward_with_local_mask(self, state_feature, action_feature, feature, local_mask, prob, current_pred_step):

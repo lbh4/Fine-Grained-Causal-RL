@@ -130,11 +130,11 @@ class NearestEmbedEMA(nn.Module):
             flatten = x.permute(1, 0).contiguous().view(x.shape[1], -1) # [code_dim, bs]
 
             self.cluster_size.data.mul_(self.decay).add_(
-                1 - self.decay, n_idx_choice
+                n_idx_choice, alpha=1 - self.decay
             )
             embed_sum = flatten @ emb_onehot
             self.embed_avg.data.mul_(self.decay).add_(
-                1 - self.decay, embed_sum)
+                embed_sum, alpha=1 - self.decay)
 
             n = self.cluster_size.sum()
             cluster_size = (

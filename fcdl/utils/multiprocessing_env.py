@@ -27,6 +27,8 @@ def worker(remote, parent_remote, env_fn_wrapper):
             break
         elif cmd == 'observation_spec':
             remote.send(env.observation_spec())
+        elif cmd == 'observation_dims':
+            remote.send(env.observation_dims())
         elif cmd == 'workspace_spec':
             remote.send(env.workspace_spec())
         elif cmd == 'save_mlps':
@@ -39,8 +41,9 @@ def worker(remote, parent_remote, env_fn_wrapper):
             attr_name = cmd[len("get_attr_"):]
             attr = getattr(env, attr_name, None)
             if attr is None:
-                logging.warning("Attribute {} not found in env".format(attr_name))
-            remote.send(attr)
+                remote.send((False, None))
+            else:
+                remote.send((True, attr))
         else:
             raise NotImplementedError
 
@@ -170,15 +173,26 @@ class SubprocVecEnv(VecEnv):
         self.remotes[0].send(('workspace_spec', None))
         return self.remotes[0].recv()
 
+    def observation_dims(self):
+        self._assert_not_closed()
+        self.remotes[0].send(('observation_dims', None))
+        return self.remotes[0].recv()
+
     def __getattr__(self, name):
         self._assert_not_closed()
         if 'magnetic_force' in name:
             for remote in self.remotes:
                 remote.send((f'get_attr_{name}', None))
-            res = [remote.recv() for remote in self.remotes]
+            results = [remote.recv() for remote in self.remotes]
+            if not all(found for found, _ in results):
+                raise AttributeError(name)
+            res = [value for _, value in results]
         else: 
             self.remotes[0].send(('get_attr_{}'.format(name), None))
-            res = self.remotes[0].recv()
+            found, value = self.remotes[0].recv()
+            if not found:
+                raise AttributeError(name)
+            res = value
         return res
 
     def _assert_not_closed(self):

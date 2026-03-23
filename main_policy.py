@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 import time
 
 import numpy as np
@@ -31,6 +32,8 @@ def ood_evaluation(params, inference, obs_batch, actions_batch, next_obses_batch
     with torch.no_grad():
         if params.env_params.env_name == 'Chemical':
             ood_evaluation_chemical(params, inference, obs_batch, actions_batch, next_obses_batch, info_batch, step)
+        elif params.env_params.env_name == 'Magnetic':
+            ood_evaluation_magnetic(params, inference, step)
         else:
             pass
 
@@ -54,14 +57,98 @@ def ood_evaluation_chemical(params, inference, obs_batch, actions_batch, next_ob
     wandb.log(test_detail, step+1)
     inference.encoder.chemical_train = True
 
+
+def collect_magnetic_ood_batch(params, batch_size, test_idx):
+    env = get_env(params, test_idx=test_idx)
+    obses = {k: [] for k in params.obs_keys}
+    next_obses = {k: [] for k in params.obs_keys}
+    actions = []
+    lcms = []
+
+    obs = env.reset()
+    low, high = env.action_spec
+    for _ in range(batch_size):
+        action = np.random.uniform(low, high).astype(np.float32)
+        next_obs, _, done, info = env.step(action)
+        for key in params.obs_keys:
+            obses[key].append(np.array(obs[key], copy=True))
+            next_obses[key].append(np.array(next_obs[key], copy=True))
+        actions.append(np.array(action, copy=True))
+        lcms.append(np.array(info["lcm"], copy=True))
+        obs = env.reset() if done else next_obs
+
+    env.close()
+    obses = {k: np.stack(v, axis=0) for k, v in obses.items()}
+    next_obses = {k: np.stack(v, axis=0) for k, v in next_obses.items()}
+    actions = np.stack(actions, axis=0)
+    info_batch = {"lcms": np.stack(lcms, axis=0)}
+    return obses, actions, next_obses, info_batch
+
+
+def ood_evaluation_magnetic(params, inference, step):
+    test_params = params.env_params.magnetic_env_params.test_params
+    batch_size = params.training_params.ood_eval_batch_size
+    test_detail = {}
+    for i, test_param in enumerate(test_params):
+        obs_batch, actions_batch, next_obses_batch, info_batch = collect_magnetic_ood_batch(params, batch_size, i)
+        ood_eval_detail = inference.ood_prediction(obs_batch, actions_batch, next_obses_batch, info_batch)
+        wandb_name = f"test/{test_param.name}/inference"
+        for k, v in ood_eval_detail.items():
+            test_detail[f"{wandb_name}/{k}"] = v
+    wandb.log(test_detail, step + 1)
+
 def test_policy_evaluation(params, inference, policy, step):
     inference.eval()
     policy.eval()
     with torch.no_grad():
         if params.env_params.env_name == 'Chemical':
             test_policy_evaluation_chemical(params, inference, policy, step)
+        elif params.env_params.env_name == 'Magnetic':
+            test_policy_evaluation_magnetic(params, inference, policy, step)
         else:
             pass
+
+def test_policy_evaluation_magnetic(params, inference, policy, step):
+    test_params = params.env_params.magnetic_env_params.test_params
+    training_params = params.training_params
+    test_detail = {}
+    for i, test_param in enumerate(test_params):
+        env = get_env(params, test_idx=i)
+        episode_num = 0
+        episode_reward = 0
+        episode_reward_mean = []
+        success = False
+        success_hist = []
+        test_global_step = 0
+        wandb_name = f"test/{test_param.name}/policy"
+
+        obs = env.reset()
+        while episode_num < training_params.total_test_episode_num:
+            action = policy.act(obs, deterministic=True)
+            next_obs, env_reward, done, info = env.step(action)
+            episode_reward += env_reward
+            success = success or info["success"]
+            obs = next_obs
+            if done:
+                success_hist.append(success)
+                episode_reward_mean.append(episode_reward)
+                episode_reward = 0
+                success = False
+                episode_num += 1
+                obs = env.reset()
+            test_global_step += 1
+            logging.info(
+                "Testing %s: test_global_step: %d, episode_num: %d, mean_episode_reward: %f",
+                test_param.name,
+                test_global_step,
+                episode_num,
+                np.mean(episode_reward_mean) if episode_reward_mean else 0.0,
+            )
+        env.close()
+
+        test_detail[f"{wandb_name}/episode_reward_mean"] = np.mean(episode_reward_mean, axis=0)
+        test_detail[f"{wandb_name}/success_ratio"] = np.mean(success_hist, axis=0)
+    wandb.log(test_detail, step + 1)
 
 def test_policy_evaluation_chemical(params, inference, policy, step):
     test_params = params.env_params.chemical_env_params.test_params
@@ -107,7 +194,8 @@ def test_policy_evaluation_chemical(params, inference, policy, step):
                             episode_num += 1
                     test_global_step += 1
                     logging.info("Testing %s_s%s: test_global_step: %d, episode_num: %d, mean_episode_reward: %f", 
-                                test_env_name, test_scale, test_global_step, episode_num, np.mean(episode_reward_mean))
+                                test_env_name, test_scale, test_global_step, episode_num,
+                                np.mean(episode_reward_mean) if episode_reward_mean else 0.0)
             else:
                 obs = env.reset()
                 while episode_num < training_params.total_test_episode_num:
@@ -125,9 +213,10 @@ def test_policy_evaluation_chemical(params, inference, policy, step):
                         obs = env.reset()
                     test_global_step += 1
                     logging.info("Testing %s_s%s: test_global_step: %d, episode_num: %d, mean_episode_reward: %f", 
-                                test_env_name, test_scale, test_global_step, episode_num, np.mean(episode_reward_mean))
-            episode_reward_mean = np.mean(episode_reward_mean, axis=0)
-            success_ratio = np.mean(success_hist, axis=0)
+                                test_env_name, test_scale, test_global_step, episode_num,
+                                np.mean(episode_reward_mean) if episode_reward_mean else 0.0)
+            episode_reward_mean = np.mean(episode_reward_mean, axis=0) if episode_reward_mean else 0.0
+            success_ratio = np.mean(success_hist, axis=0) if success_hist else 0.0
             test_detail[f"{wandb_name}/episode_reward_mean"] = episode_reward_mean
             test_detail[f"{wandb_name}/success_ratio"] = success_ratio
         if is_vecenv:
@@ -155,6 +244,10 @@ def train(params):
             params.goal_keys.append(f"target_obj{i}")
 
         env_specific_type = params.env_params.chemical_env_params.local_causal_rule
+    elif env_name == "Magnetic":
+        params.obs_keys = ["ball", "box", "eef"]
+        params.goal_keys = []
+        env_specific_type = "magnetic"
     wandb.init(project=f'{env_name}-{env_specific_type}',
                name=f'{params.training_params.inference_algo}-{time.strftime("%m%d_%H-%M-%S")}',
                config=dict(params),
@@ -345,9 +438,12 @@ def train(params):
                     loss_details["inference_eval"].append(eval_loss_detail)
                 
                 if (step + 1) % training_params.ood_eval_freq == 0:
-                    obs_batch, actions_batch, next_obses_batch, info_batch = \
-                        replay_buffer.sample_ood_eval(training_params.ood_eval_batch_size, use_part="all")
-                    ood_evaluation(params, inference, obs_batch, actions_batch, next_obses_batch, info_batch, step)
+                    if env_name == "Chemical":
+                        obs_batch, actions_batch, next_obses_batch, info_batch = \
+                            replay_buffer.sample_ood_eval(training_params.ood_eval_batch_size, use_part="all")
+                        ood_evaluation(params, inference, obs_batch, actions_batch, next_obses_batch, info_batch, step)
+                    elif env_name == "Magnetic":
+                        ood_evaluation(params, inference, None, None, None, None, step)
             
             for module_name, module_loss_detail in loss_details.items():
                 if not module_loss_detail:
@@ -374,7 +470,14 @@ def train(params):
             test_policy_evaluation(params, inference, policy, step)
             params.stage = 'train'
 
+def get_config_path(default="policy_params.json"):
+    for arg in sys.argv[1:]:
+        if arg.startswith("--config="):
+            return arg.split("=", 1)[1]
+    return default
+
+
 if __name__ == "__main__":
-    params = TrainingParams(training_params_fname="policy_params.json", train=True)
+    params = TrainingParams(training_params_fname=get_config_path(), train=True)
     override_params_from_cli_args(params)
     train(params)

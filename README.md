@@ -39,6 +39,9 @@ bash scripts/run_ncd.sh
 
 # Run Oracle
 bash scripts/run_oracle.sh
+
+# Run FCDL (Ours) on Magnetic
+bash scripts/run_ours_magnetic.sh
 ```
 
 ### Arguments
@@ -49,7 +52,7 @@ bash scripts/run_oracle.sh
   * `test3`: n=6
 * `codebook_size, code_dim`: quantization degree (K) and dimension for each latent code; default is (16, 16) but other choices also work well; (4, 8), (8, 16), (32, 16), etc
 * `vqvae_ema`: using EMA to update the codebook; default is True
-* `code_labeling`: default is False for FCDL and True for NCD but any choices work well for both methods
+* `code_labeling`: default is False for FCDL and True for NCD
 * `reg_coef`: $\lambda$ in Eq. (6); default is 0.001
 * `commit_coef`: $\beta$ in Eq. (6); default is 0.25
 
