@@ -10,14 +10,14 @@ from .inference import Inference
 from .inference_utils import forward_network, forward_network_batch, reset_layer
 
 
-class InferenceOursBase(Inference, metaclass=ABCMeta):
+class InferenceFCDLBase(Inference, metaclass=ABCMeta):
     def __init__(self, encoder, params):
         self.is_eval = True
-        super(InferenceOursBase, self).__init__(encoder, params)
+        super(InferenceFCDLBase, self).__init__(encoder, params)
 
     def init_model(self):
         params = self.params
-        ours_params = self.params.ours_params
+        fcdl_params = self.params.fcdl_params
 
         # model params
         continuous_state = self.continuous_state
@@ -27,12 +27,12 @@ class InferenceOursBase(Inference, metaclass=ABCMeta):
         self.feature_inner_dim = self.params.feature_inner_dim
 
         device = self.device
-        self.local_mask_sampling_num = params.ours_params.local_mask_sampling_num
-        self.eval_local_mask_sampling_num = params.ours_params.eval_local_mask_sampling_num
-        self.code_labeling = ours_params.code_labeling
+        self.local_mask_sampling_num = params.fcdl_params.local_mask_sampling_num
+        self.eval_local_mask_sampling_num = params.fcdl_params.eval_local_mask_sampling_num
+        self.code_labeling = fcdl_params.code_labeling
         self.learn_codebook = not self.use_gt_global_mask
 
-        fc_dims = ours_params.feature_fc_dims
+        fc_dims = fcdl_params.feature_fc_dims
 
         num_state_var = feature_dim
         self.num_state_var = num_state_var
@@ -57,7 +57,7 @@ class InferenceOursBase(Inference, metaclass=ABCMeta):
             in_dim = action_dim
         else:
             in_dim = 1
-        for out_dim in ours_params.feature_fc_dims[:1]:
+        for out_dim in fcdl_params.feature_fc_dims[:1]:
             self.action_feature_weights.append(nn.Parameter(torch.zeros(self.num_action_variable, in_dim, out_dim)))
             self.action_feature_biases.append(nn.Parameter(torch.zeros(self.num_action_variable, 1, out_dim)))
             in_dim = out_dim
@@ -65,21 +65,21 @@ class InferenceOursBase(Inference, metaclass=ABCMeta):
         # state feature extractor
         if continuous_state:
             in_dim = 1
-            out_dim = ours_params.feature_fc_dims[0]
+            out_dim = fcdl_params.feature_fc_dims[0]
             self.state_feature_1st_layer_weights.append(nn.Parameter(torch.zeros(feature_dim, in_dim, out_dim)))
             self.state_feature_1st_layer_biases.append(nn.Parameter(torch.zeros(feature_dim, 1, out_dim)))
         else:
-            out_dim = ours_params.feature_fc_dims[0]
+            out_dim = fcdl_params.feature_fc_dims[0]
             for feature_i_dim in self.feature_inner_dim:
                 in_dim = feature_i_dim
                 self.state_feature_1st_layer_weights.append(nn.Parameter(torch.zeros(1, in_dim, out_dim)))
                 self.state_feature_1st_layer_biases.append(nn.Parameter(torch.zeros(1, 1, out_dim)))
 
-        fc_dims = ours_params.feature_fc_dims[1:]
+        fc_dims = fcdl_params.feature_fc_dims[1:]
         in_dim = (self.num_state_var + self.num_action_variable) * out_dim
-        if self.params.ours_params.code_labeling:
-            if 'ours' in self.params.training_params.inference_algo:
-                in_dim = in_dim + self.params.ours_params.codebook_size
+        if self.params.fcdl_params.code_labeling:
+            if 'fcdl' in self.params.training_params.inference_algo:
+                in_dim = in_dim + self.params.fcdl_params.codebook_size
             elif 'ncd' in self.params.training_params.inference_algo:
                 in_dim = in_dim + (self.num_state_var + self.num_action_variable)
         for out_dim in fc_dims:
@@ -87,8 +87,8 @@ class InferenceOursBase(Inference, metaclass=ABCMeta):
             self.sa_feature_biases.append(nn.Parameter(torch.zeros(self.num_state_var, 1, out_dim)))
             in_dim = out_dim
         
-        in_dim = ours_params.feature_fc_dims[-1]
-        for out_dim in ours_params.generative_fc_dims:
+        in_dim = fcdl_params.feature_fc_dims[-1]
+        for out_dim in fcdl_params.generative_fc_dims:
             self.generative_weights.append(nn.Parameter(torch.zeros(self.num_state_var, in_dim, out_dim)))
             self.generative_biases.append(nn.Parameter(torch.zeros(self.num_state_var, 1, out_dim)))
             in_dim = out_dim

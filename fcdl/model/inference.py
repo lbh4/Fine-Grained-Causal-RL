@@ -46,12 +46,26 @@ class Inference(nn.Module):
         self.train()
     
     def get_gt_global_mask(self, num_state_variable, num_action_variable):
+        num_state_variable = int(num_state_variable)
+        num_action_variable = int(num_action_variable)
         if self.env_name == 'Chemical':
             self.gt_global_mask = torch.zeros(num_state_variable, num_state_variable + num_action_variable).to(self.device)
             self.gt_global_mask.fill_diagonal_(1)
             self.gt_global_mask[:, -1] = 1
             lower_indices = np.tril_indices(num_state_variable)
             self.gt_global_mask[lower_indices[0], lower_indices[1]] = 1
+        elif self.env_name == "Magnetic":
+            self.gt_global_mask = torch.zeros(num_state_variable, num_state_variable + num_action_variable).to(self.device)
+            self.gt_global_mask[0, 0] = 1
+            self.gt_global_mask[1, [1, 2, 4, 5]] = 1
+            self.gt_global_mask[2, [1, 2, 4, 5]] = 1
+            self.gt_global_mask[3, 3] = 1
+            self.gt_global_mask[4, 4] = 1
+            self.gt_global_mask[5, 5] = 1
+            self.gt_global_mask[6, 6] = 1
+            self.gt_global_mask[7, 7] = 1
+            self.gt_global_mask[8, 8] = 1
+            self.gt_global_mask[6:9, -num_action_variable:] = 1
         else:
             raise NotImplementedError
 

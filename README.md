@@ -23,25 +23,37 @@ conda env create -f environment.yml
 ```
 
 ### Run experiments
-Change "wandb_dir" in policy_params.json
+Change `wandb_dir` in the config you plan to run.
 ```
-# Run FCDL (Ours)
-bash scripts/run_ours.sh
+# Run FCDL on Chemical
+bash scripts/fcdl/run_fcdl_chemical.sh
 
 # Run MLP
-bash scripts/run_mlp.sh
+bash scripts/mlp/run_mlp_chemical.sh
 
 # Run GNN
-bash scripts/run_gnn.sh
+bash scripts/gnn/run_gnn_chemical.sh
 
 # Run NCD
-bash scripts/run_ncd.sh
+bash scripts/ncd/run_ncd_chemical.sh
 
 # Run Oracle
-bash scripts/run_oracle.sh
+bash scripts/oracle/run_oracle_chemical.sh
 
-# Run FCDL (Ours) on Magnetic
-bash scripts/run_ours_magnetic.sh
+# Run FCDL on Magnetic (choose the GPU-specific script you want)
+bash scripts/fcdl/run_fcdl_magnetic_gpu1.sh
+
+# Run MLP on Magnetic
+bash scripts/mlp/run_mlp_magnetic_gpu1.sh
+
+# Run GNN on Magnetic
+bash scripts/gnn/run_gnn_magnetic_gpu1.sh
+
+# Run NCD on Magnetic
+bash scripts/ncd/run_ncd_magnetic_gpu1.sh
+
+# Run Oracle on Magnetic
+bash scripts/oracle/run_oracle_magnetic_gpu1.sh
 ```
 
 ### Arguments

@@ -46,6 +46,7 @@ class TrainingParams(AttrDict):
     def __init__(self, training_params_fname="params.json", train=True):
         config = json.load(open(training_params_fname))
         super(TrainingParams, self).__init__(config)
+        self._canonicalize_names()
 
         repo_path = os.path.dirname(self.__dict__["wandb_dir"])
         training_params = self.training_params
@@ -64,6 +65,13 @@ class TrainingParams(AttrDict):
             if config_name.startswith("policy_params") and training_params.replay_buffer_params.saving_freq:
                 self.replay_buffer_dir = os.path.join(repo_path, "replay_buffer", experiment_dirname)
                 os.makedirs(self.replay_buffer_dir)
+
+    def _canonicalize_names(self):
+        if hasattr(self, "ours_params"):
+            raise ValueError("Legacy key 'ours_params' is no longer supported. Use 'fcdl_params'.")
+
+        if getattr(self.training_params, "inference_algo", None) == "ours":
+            raise ValueError("Legacy inference_algo 'ours' is no longer supported. Use 'fcdl'.")
 
 
 

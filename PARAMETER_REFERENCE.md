@@ -2,7 +2,7 @@
 
 This file documents the parameters used by:
 
-- `policy_params.json`
+- `policy_params_chemical.json`
 - `policy_params_magnetic.json`
 
 Primary paper source:
@@ -58,7 +58,7 @@ Directory used by WandB for local run files.
 
 Python logging level.
 
-## `ours_params`
+## `fcdl_params`
 
 These configure FCDL itself.
 
@@ -164,7 +164,7 @@ Number of local-mask samples drawn during evaluation.
 
 Dynamics / causal inference method.
 
-- This repo uses `"ours"` for FCDL runs.
+- This repo uses `"fcdl"` for FCDL runs.
 
 ### `rl_algo`
 

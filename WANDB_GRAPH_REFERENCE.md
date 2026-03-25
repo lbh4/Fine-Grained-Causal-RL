@@ -24,7 +24,7 @@ The main logging sites are:
 
 - [`main_policy.py`](/home/byeonghui/Fine-Grained-Causal-RL/main_policy.py)
 - [`fcdl/model/inference.py`](/home/byeonghui/Fine-Grained-Causal-RL/fcdl/model/inference.py)
-- [`fcdl/model/inference_ours_base.py`](/home/byeonghui/Fine-Grained-Causal-RL/fcdl/model/inference_ours_base.py)
+- [`fcdl/model/inference_fcdl_base.py`](/home/byeonghui/Fine-Grained-Causal-RL/fcdl/model/inference_fcdl_base.py)
 
 ## Graphs Logged In Both Chemical And Magnetic
 
@@ -132,7 +132,7 @@ Why it matters:
 Source:
 
 - generic inference update: [`fcdl/model/inference.py:230`](/home/byeonghui/Fine-Grained-Causal-RL/fcdl/model/inference.py#L230)
-- `ours` update path: [`fcdl/model/inference_ours_base.py:276`](/home/byeonghui/Fine-Grained-Causal-RL/fcdl/model/inference_ours_base.py#L276)
+- `fcdl` update path: [`fcdl/model/inference_fcdl_base.py:276`](/home/byeonghui/Fine-Grained-Causal-RL/fcdl/model/inference_fcdl_base.py#L276)
 - logging: [`main_policy.py:448`](/home/byeonghui/Fine-Grained-Causal-RL/main_policy.py#L448)
 
 Meaning:
@@ -182,7 +182,7 @@ Why it matters:
 
 - this is the closest thing to a validation-loss curve for the dynamics model
 
-## Graphs Usually Seen With `ours`
+## Graphs Usually Seen With `fcdl`
 
 These appear when the current inference method is the FCDL masking / codebook model.
 
@@ -190,7 +190,7 @@ These appear when the current inference method is the FCDL masking / codebook mo
 
 Source:
 
-- [`fcdl/model/inference_ours_base.py:278`](/home/byeonghui/Fine-Grained-Causal-RL/fcdl/model/inference_ours_base.py#L278)
+- [`fcdl/model/inference_fcdl_base.py:278`](/home/byeonghui/Fine-Grained-Causal-RL/fcdl/model/inference_fcdl_base.py#L278)
 
 Meaning:
 
@@ -208,7 +208,7 @@ Interpretation:
 
 Source:
 
-- [`fcdl/model/inference_ours_base.py:286`](/home/byeonghui/Fine-Grained-Causal-RL/fcdl/model/inference_ours_base.py#L286)
+- [`fcdl/model/inference_fcdl_base.py:286`](/home/byeonghui/Fine-Grained-Causal-RL/fcdl/model/inference_fcdl_base.py#L286)
 
 Meaning:
 
@@ -222,7 +222,7 @@ Interpretation:
 
 Source:
 
-- [`fcdl/model/inference_ours_base.py:287`](/home/byeonghui/Fine-Grained-Causal-RL/fcdl/model/inference_ours_base.py#L287)
+- [`fcdl/model/inference_fcdl_base.py:287`](/home/byeonghui/Fine-Grained-Causal-RL/fcdl/model/inference_fcdl_base.py#L287)
 
 Meaning:
 
@@ -236,7 +236,7 @@ Interpretation:
 
 Source:
 
-- [`fcdl/model/inference_ours_base.py:288`](/home/byeonghui/Fine-Grained-Causal-RL/fcdl/model/inference_ours_base.py#L288)
+- [`fcdl/model/inference_fcdl_base.py:288`](/home/byeonghui/Fine-Grained-Causal-RL/fcdl/model/inference_fcdl_base.py#L288)
 
 Meaning:
 
@@ -300,7 +300,7 @@ These correspond to different predefined noisy-node settings in the Chemical env
 Relevant code:
 
 - OOD replay selection: [`fcdl/utils/replay_buffer.py:142`](/home/byeonghui/Fine-Grained-Causal-RL/fcdl/utils/replay_buffer.py#L142)
-- test env list: [`policy_params.json:78`](/home/byeonghui/Fine-Grained-Causal-RL/policy_params.json#L78)
+- test env list: [`policy_params_chemical.json:78`](/home/byeonghui/Fine-Grained-Causal-RL/policy_params_chemical.json#L78)
 
 ### `test/test1/policy/episode_reward_mean`, `test/test2/policy/episode_reward_mean`, `test/test3/policy/episode_reward_mean`
 

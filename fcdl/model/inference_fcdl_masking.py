@@ -1,15 +1,15 @@
 import torch
 import torch.nn.functional as F
 
-from .inference_ours_base import InferenceOursBase
+from .inference_fcdl_base import InferenceFCDLBase
 from .inference_utils import forward_network, reset_layer
 
-class InferenceOursMask(InferenceOursBase):
+class InferenceFCDLMask(InferenceFCDLBase):
     def __init__(self, encoder, params):
-        super(InferenceOursMask, self).__init__(encoder, params)
+        super(InferenceFCDLMask, self).__init__(encoder, params)
 
     def init_model(self):
-        super(InferenceOursMask, self).init_model()
+        super(InferenceFCDLMask, self).init_model()
 
     def reset_params_sa_feature(self):
         for w, b in zip(self.sa_feature_weights, self.sa_feature_biases):

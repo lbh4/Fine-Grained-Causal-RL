@@ -3,21 +3,21 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .gumbel import GumbelMatrix_NCD
-from .inference_ours_masking import InferenceOursMask
+from .inference_fcdl_masking import InferenceFCDLMask
 from .inference_utils import forward_network
 
 EPS = 1e-4
 
 
-class InferenceNCD(InferenceOursMask):
+class InferenceNCD(InferenceFCDLMask):
     def __init__(self, encoder, params):
         super(InferenceNCD, self).__init__(encoder, params)
 
     def init_model(self):
         super(InferenceNCD, self).init_model()
 
-        ours_params = self.params.ours_params
-        fc_dims = ours_params.feature_fc_dims
+        fcdl_params = self.params.fcdl_params
+        fc_dims = fcdl_params.feature_fc_dims
         
         feature_dim = self.feature_dim
         action_dim = self.action_dim
@@ -97,4 +97,4 @@ class InferenceNCD(InferenceOursMask):
         self.eval()
         self.local_causal_model.training = False
         self.local_causal_model.eval()
-        return InferenceOursMask.eval_prediction(self, obs, actions, next_obses, info_batch)
+        return InferenceFCDLMask.eval_prediction(self, obs, actions, next_obses, info_batch)

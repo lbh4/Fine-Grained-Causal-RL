@@ -85,8 +85,8 @@ def gumbel_sigmoid(log_alpha, device, bs=None, tau=1, hard=False):
 class VQVAEGumbelMatrixLatent(torch.nn.Module):
     def __init__(self, params, feature_dim, action_dim, num_state_var, num_action_var, continuous_state, fc_dims, device):
         super(VQVAEGumbelMatrixLatent, self).__init__()
-        self.local_mask_sampling_num = params.ours_params.local_mask_sampling_num
-        self.eval_local_mask_sampling_num = params.ours_params.eval_local_mask_sampling_num
+        self.local_mask_sampling_num = params.fcdl_params.local_mask_sampling_num
+        self.eval_local_mask_sampling_num = params.fcdl_params.eval_local_mask_sampling_num
         self.continuous_state = continuous_state
         self.feature_dim = feature_dim
         self.action_dim = action_dim
@@ -105,7 +105,7 @@ class VQVAEGumbelMatrixLatent(torch.nn.Module):
         if not self.learn_action: self.lcm_dim_2 = self.lcm_dim_2 - self.num_action_var
         self.adjust_dimension = self.adjust_dimension_default
         self.input_dim = 0
-        self.ours_type = params.training_params.inference_algo
+        self.fcdl_type = params.training_params.inference_algo
         
         self.preprocess = self.preprocess_ours_mask
 
@@ -119,12 +119,12 @@ class VQVAEGumbelMatrixLatent(torch.nn.Module):
         self.lower_inds = np.tril_indices(self.num_state_var, -1)
         self.upper_inds = np.triu_indices(self.num_state_var, 1)
 
-        self.code_dim = params.ours_params.code_dim
-        self.codebook_size = params.ours_params.codebook_size
+        self.code_dim = params.fcdl_params.code_dim
+        self.codebook_size = params.fcdl_params.codebook_size
 
-        if 'ours' in self.ours_type:
-            enc_fc_dims = params.ours_params.vq_encode_fc_dims
-            dec_fc_dims = params.ours_params.vq_decode_fc_dims
+        if 'fcdl' in self.fcdl_type:
+            enc_fc_dims = params.fcdl_params.vq_encode_fc_dims
+            dec_fc_dims = params.fcdl_params.vq_decode_fc_dims
             
             encs = nn.Sequential()
             in_dim = self.input_dim
@@ -148,18 +148,18 @@ class VQVAEGumbelMatrixLatent(torch.nn.Module):
             
             self.apply(kaiming_init)
 
-            self.ema = params.ours_params.vqvae_ema
+            self.ema = params.fcdl_params.vqvae_ema
             if self.ema:
-                decay = params.ours_params.ema
+                decay = params.fcdl_params.ema
                 self.emb = NearestEmbedEMA(self.codebook_size, self.code_dim, decay=decay)
             else:
                 self.emb = NearestEmbed(self.codebook_size, self.code_dim)
 
         self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
-        self.reg_coef = params.ours_params.reg_coef
-        self.vq_coef = params.ours_params.vq_coef
-        self.commit_coef = params.ours_params.commit_coef
+        self.reg_coef = params.fcdl_params.reg_coef
+        self.vq_coef = params.fcdl_params.vq_coef
+        self.commit_coef = params.fcdl_params.commit_coef
         
         self.code_index = []
         self.reset_loss()
@@ -273,7 +273,7 @@ class GumbelMatrix_NCD(VQVAEGumbelMatrixLatent):
     def __init__(self, params, feature_dim, action_dim, num_state_var, num_action_var, continuous_state, fc_dims, device):
         super(GumbelMatrix_NCD, self).__init__(params, feature_dim, action_dim, num_state_var, num_action_var, continuous_state, fc_dims, device)
         
-        ncd_fc_dims = params.ours_params.ncd_fc_dims
+        ncd_fc_dims = params.fcdl_params.ncd_fc_dims
         
         enc = []
         in_dim = self.input_dim

@@ -6,7 +6,7 @@
     "cuda_id": 0,
     "wandb_dir": "/home/byeonghui/Fine-Grained-Causal-RL/wandb_runs/",
     "loglevel": "WARNING",
-    "ours_params": {
+    "fcdl_params": {
         "feature_fc_dims": [128, 128],
         "generative_fc_dims": [128, 128],
         "vq_encode_fc_dims": [128, 64],
@@ -24,7 +24,7 @@
         "eval_local_mask_sampling_num": 1
     },
     "training_params": {
-        "inference_algo": "ours",
+        "inference_algo": "fcdl",
         "rl_algo": "model_based",
         "load_id": "",
         "load_inference": "",

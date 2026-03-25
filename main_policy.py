@@ -16,7 +16,7 @@ from fcdl.model.encoder import make_encoder
 from fcdl.model.inference_gnn import InferenceGNN
 from fcdl.model.inference_mlp import InferenceMLP
 from fcdl.model.inference_ncd import InferenceNCD
-from fcdl.model.inference_ours_masking import InferenceOursMask
+from fcdl.model.inference_fcdl_masking import InferenceFCDLMask
 from fcdl.model.model_based import ModelBased
 from fcdl.model.random_policy import RandomPolicy
 from fcdl.utils.replay_buffer import ReplayBuffer
@@ -248,6 +248,7 @@ def train(params):
         params.obs_keys = ["ball", "box", "eef"]
         params.goal_keys = []
         env_specific_type = "magnetic"
+
     wandb.init(project=f'{env_name}-{env_specific_type}',
                name=f'{params.training_params.inference_algo}-{time.strftime("%m%d_%H-%M-%S")}',
                config=dict(params),
@@ -260,7 +261,9 @@ def train(params):
     if getattr(params.training_params, "load_id", None) is not None:
         load_dir = params.wandb_dir + f"{env_name}/{params.training_params.load_id}/"
         load_params = torch.load(os.path.join(load_dir, "params"))
-        assert params.training_params.inference_algo == load_params["training_params"]["inference_algo"]
+        current_inference_algo = params.training_params.inference_algo
+        loaded_inference_algo = load_params["training_params"]["inference_algo"]
+        assert current_inference_algo == loaded_inference_algo
         if getattr(params.training_params, "load_inference", None) is not None:
             params.training_params.load_inference = \
                 os.path.join(load_dir, "trained_models", f"inference_{params.training_params.load_inference}")
@@ -296,10 +299,10 @@ def train(params):
         Inference = InferenceNCD
     elif inference_algo == "oracle":
         assert params.inference_params.use_gt_global_mask
-        assert not params.ours_params.code_labeling
-        Inference = InferenceOursMask
-    elif "ours" in inference_algo:
-        Inference = InferenceOursMask
+        assert not params.fcdl_params.code_labeling
+        Inference = InferenceFCDLMask
+    elif "fcdl" in inference_algo:
+        Inference = InferenceFCDLMask
     else:
         raise NotImplementedError
     inference = Inference(encoder, params)
@@ -470,7 +473,7 @@ def train(params):
             test_policy_evaluation(params, inference, policy, step)
             params.stage = 'train'
 
-def get_config_path(default="policy_params.json"):
+def get_config_path(default="policy_params_chemical.json"):
     for arg in sys.argv[1:]:
         if arg.startswith("--config="):
             return arg.split("=", 1)[1]
@@ -480,4 +483,5 @@ def get_config_path(default="policy_params.json"):
 if __name__ == "__main__":
     params = TrainingParams(training_params_fname=get_config_path(), train=True)
     override_params_from_cli_args(params)
+    params._canonicalize_names()
     train(params)
