@@ -12,7 +12,7 @@
         "vq_encode_fc_dims": [128, 64],
         "vq_decode_fc_dims": [32],
         "ncd_fc_dims": [128, 128],
-        "code_labeling": false,
+        "code_labeling": true,
         "vqvae_ema": true,
         "ema": 0.99,
         "codebook_size": 16,
